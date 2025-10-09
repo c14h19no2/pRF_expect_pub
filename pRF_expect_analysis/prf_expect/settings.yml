@@ -1,0 +1,112 @@
+project_name: prfexpect
+general:
+  data_dir: ""
+  subject_list: ['sub-001', 'sub-002', 'sub-004', 'sub-005', 'sub-007', 'sub-009', 'sub-012']
+  total_subjects: ['sub-001', 'sub-002', 'sub-003', 'sub-004', 'sub-005', 'sub-006', 'sub-007', 'sub-009', 'sub-010', 'sub-012']
+design:
+  tasks: ['pRF', 'PE']
+  sessions: ['ses-1']
+  runs: ['run-1', 'run-2', 'run-3', 'run-4', 'run-5', 'run-6']
+  pRF_runs: ['run-1', 'run-3', 'run-5']
+  PE_runs: ['run-2', 'run-4', 'run-6']
+  runs_per_task: ['run-01', 'run-02', 'run-03']
+  subruns: ['subrun1', 'subrun2', 'subrun3']
+mri:
+  dummy_scans: 4
+  TR: 1.6
+  space: fsaverage
+dm:
+  resample_size: [375, 63, 63]
+  coil_cutoff:
+    sub-001: 0.1
+    sub-002: 0.05
+    sub-004: 0
+    sub-005: 0.05
+    sub-007: 0.1
+    sub-009: 0
+    sub-012: 0.05
+preprocessing:
+  highpass:
+    low-pass-band: 0.01
+    type: dct
+monitor: 
+  screen_size_pix: [1920, 1080]
+  screen_size_cm: [69.84, 39.29]
+  screen_distance_cm: 196
+
+QC:
+  bad_PE_runs:
+    sub-001: []
+    sub-002: []
+    sub-004: ['run-02']
+    sub-005: []
+    sub-007: []
+    sub-009: []
+    sub-012: []
+  bad_eye_tracking_runs:
+    sub-001:
+      "2": [1, 2, 3]
+      "4": []
+      "6": [2]
+    sub-002:
+      "1": [2, 3]
+      "2": [1, 2, 3]
+      "3": []
+      "4": []
+      "6": []
+    sub-004:
+      "1": []
+      "2": []
+      "3": [1, 2, 3]
+      "4": [1, 2, 3]
+      "6": []
+    sub-005:
+      "1": [3]
+      "2": [1, 2, 3]
+      "4": [2, 3]
+      "6": [1, 2, 3]
+    sub-007:
+      "1": []
+      "2": []
+      "4": []
+      "6": []
+    sub-009:
+      "1": [1, 2, 3]
+      "2": [1, 2, 3]
+      "4": []
+      "5": [1, 2, 3]
+      "6": [1, 2, 3]
+    sub-012:
+      "1": [3]
+      "2": [1, 3]
+      "4": [2, 3]
+      "6": []
+
+slurm:
+  data_dir: /projects/0/vuse0612/prfexpect/
+  n_chunks: 1
+  duration: 960
+  cpus: 96
+
+prf:
+  model_type: "norm"
+  eps: 1e-1
+  rsq_threshold: 0.1
+  grid_nr: 20
+  fixed_grid_baseline: 0
+  grid_bounds: [0, 1000]
+  prf_ampl: [0,1000]
+  bold_bsl: [0,0]
+  hrf:
+    pars: [1, 4.6, 0]
+    deriv_bound: [0,10]
+    disp_bound: [0,0]
+  norm:
+    surround_amplitude_grid: [0.05,0.2,0.4,0.7,1,3]
+    surround_size_grid: [5,8,12,18]
+    neural_baseline_grid: [10.0,20.0,30.0,40.0,50.0,60.0,70.0,80.0,90.0,100.0]
+    surround_baseline_grid: [10.0,20.0,30.0,40.0,50.0,60.0,70.0,80.0,90.0,100.0,150.0,200.0,250.0,300.0,350.0,400.0,450.0,500.0,550.0,600.0,650.0,700.0,750.0,800.0,850.0,900.0,950.0,1000.0]
+    surround_amplitude_bound: [0,1000]
+    # surround_size_bound: [0.1, 20]
+    neural_baseline_bound: [0,1000]
+    surround_baseline_bound: [1e-6,1000]
