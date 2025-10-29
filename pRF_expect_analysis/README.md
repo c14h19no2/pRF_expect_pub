@@ -2,6 +2,9 @@
 This repository contains the analysis code for the pRFExpect experiment.
 
 ## Requirements
+OS: I ran this script on Rocky Linux 8.10 (Green Obsidian) and macOS 15 (Apple Silicon and Intel). Other OS should be also fine.
+Python: 3.9–3.13 recommended. It takes a few minutes to install all the enviorments and this package.
+
 ### For fMRI data analysis
 - Python 3.9 or higher
 - ipykernel
