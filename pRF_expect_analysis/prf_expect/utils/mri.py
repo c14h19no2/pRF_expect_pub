@@ -15,8 +15,8 @@ from nilearn.glm.first_level.design_matrix import create_cosine_drift
 from prf_expect.utils.io import get_hemi_func_file
 
 
-def set_hrf(TR, hrf_deriv, hrf_dsip):
-    hrf_params = [1, hrf_deriv, hrf_dsip]
+def set_hrf(TR, hrf_deriv, hrf_disp):
+    hrf_params = [1, hrf_deriv, hrf_disp]
     hrf = np.array(
         [
             np.ones_like(hrf_params[1], dtype="float32")
