@@ -426,7 +426,7 @@ class Parameters:
 
                 if self.params.shape[-1] > 10:
                     params_dict["hrf_deriv"] = self.params[:, -3]
-                    params_dict["hrf_dsip"] = self.params[:, -2]
+                    params_dict["hrf_disp"] = self.params[:, -2]
 
             elif self.model == "dog":
                 params_dict = {
@@ -447,7 +447,7 @@ class Parameters:
 
                 if self.params.shape[-1] > 8:
                     params_dict["hrf_deriv"] = self.params[:, -3]
-                    params_dict["hrf_dsip"] = self.params[:, -2]
+                    params_dict["hrf_disp"] = self.params[:, -2]
 
             elif self.model == "css":
                 params_dict = {
@@ -464,7 +464,7 @@ class Parameters:
 
                 if self.params.shape[-1] > 7:
                     params_dict["hrf_deriv"] = self.params[:, -3]
-                    params_dict["hrf_dsip"] = self.params[:, -2]
+                    params_dict["hrf_disp"] = self.params[:, -2]
 
         else:
             raise ValueError(
