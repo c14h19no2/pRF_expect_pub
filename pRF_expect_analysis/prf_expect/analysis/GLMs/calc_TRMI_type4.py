@@ -197,7 +197,7 @@ fit_params = pd.read_csv(
 
 print(fit_params.keys())
 hrf_deriv = fit_params["hrf_deriv"].values
-hrf_dsip = fit_params["hrf_dsip"].values
+hrf_disp = fit_params["hrf_disp"].values
 
 
 # Load the data
