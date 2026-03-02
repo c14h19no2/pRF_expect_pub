@@ -110,13 +110,6 @@ for subject in subjects:
             )
         )
 
-        violation_dm = np.load(
-            os.path.join(
-                dm_dir,
-                f"{subject}_ses-1_task-violation_{run}_dm.npy",
-            )
-        )
-
         # Define the objects for the prf fits
         # Predict the timecourses for the pRF task
         broaden_factor_fn = f"{broaden_factor:.1f}".replace(".", "p")
