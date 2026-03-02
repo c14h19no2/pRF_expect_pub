@@ -76,7 +76,7 @@ data_dir = os.path.join(settings["general"]["data_dir"], "data")
 tasks = settings["design"]["tasks"]
 space = settings["mri"]["space"]
 PE_runs = settings["design"]["runs_per_task"]
-broaden_factor = 1.2
+broaden_factor = settings["sharpening"]["broaden_factor"]
 
 # Loop over all subjects of interest to make the predictions for
 for subject in subjects:
@@ -112,7 +112,7 @@ for subject in subjects:
 
         # Define the objects for the prf fits
         # Predict the timecourses for the pRF task
-        broaden_factor_fn = f"{broaden_factor:.1f}".replace(".", "p")
+        broaden_factor_fn = f"{broaden_factor:.2f}".replace(".", "p")
         sparse_fn = f"{subject}_ses-1_task-sparse_{run}_space-{space}_preds_sharpening-{broaden_factor_fn}.npy"
 
         predict_prf(
