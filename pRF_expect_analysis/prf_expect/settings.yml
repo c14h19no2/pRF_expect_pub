@@ -110,3 +110,6 @@ prf:
     # surround_size_bound: [0.1, 20]
     neural_baseline_bound: [0,1000]
     surround_baseline_bound: [1e-6,1000]
+  
+sharpening:
+  broaden_factor: 1.2
