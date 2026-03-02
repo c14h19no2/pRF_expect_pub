@@ -121,7 +121,6 @@ for subject in subjects:
         # Predict the timecourses for the pRF task
         broaden_factor_fn = f"{broaden_factor:.1f}".replace(".", "p")
         sparse_fn = f"{subject}_ses-1_task-sparse_{run}_space-{space}_preds_sharpening-{broaden_factor_fn}.npy"
-        violation_fn = f"{subject}_ses-1_task-violation_{run}_space-{space}_preds_sharpening-{broaden_factor_fn}.npy"
 
         predict_prf(
             subject,
@@ -131,16 +130,6 @@ for subject in subjects:
             prf_params_dir,
             output_dir,
             sparse_fn,
-            broaden_factor=broaden_factor,
-        )
-        predict_prf(
-            subject,
-            space,
-            violation_data,
-            violation_dm,
-            prf_params_dir,
-            output_dir,
-            violation_fn,
             broaden_factor=broaden_factor,
         )
 
