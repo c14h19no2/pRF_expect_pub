@@ -80,12 +80,12 @@ for subject in subjects:
 
     sub_dir = os.path.join(data_dir, "derivatives", "prf_data", subject, "ses-1")
     prf_fits_dir = os.path.join(sub_dir, "prf_fits")
-    prf_params_dir = os.path.join(prf_fits_dir, "linescanning_params")
+    prf_params_dir = os.path.join(prf_fits_dir, "prf_params")
     dm_dir = os.path.join(sub_dir, "dms")
     psc_dir = os.path.join(sub_dir, "cut_and_averaged")
 
     # make output directory to store the predictions in
-    output_dir = os.path.join(prf_fits_dir, "linescanning_predictions")
+    output_dir = os.path.join(prf_fits_dir, "prf_predictions")
     os.makedirs(output_dir, exist_ok=True)
 
     # load in the model parameters from a pickle file

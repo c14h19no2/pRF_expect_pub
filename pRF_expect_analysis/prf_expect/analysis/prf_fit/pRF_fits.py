@@ -76,7 +76,7 @@ space = settings["mri"]["space"]
 
 # make output dir
 output_dir = (
-    f"{data_dir}/derivatives/prf_data/{subject}/ses-1/prf_fits/linescanning_params"
+    f"{data_dir}/derivatives/prf_data/{subject}/ses-1/prf_fits/prf_params"
 )
 os.makedirs(output_dir, exist_ok=True)
 
