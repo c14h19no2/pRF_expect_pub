@@ -52,6 +52,96 @@ def noise_ceiling(data, bias_correction=True, do_zscore=True):
     return ev
 
 
+def _align_prediction_to_voxel_time(pred, n_voxels, n_times):
+    pred_arr = np.asarray(pred)
+    pred_2d = np.squeeze(pred_arr)
+
+    if pred_2d.ndim != 2:
+        raise ValueError(f"pred must be reducible to 2D, got shape {pred_arr.shape}")
+
+    target_shape = (n_voxels, n_times)
+    if pred_2d.shape == target_shape:
+        return pred_2d
+    if pred_2d.T.shape == target_shape:
+        return pred_2d.T
+
+    raise ValueError(
+        "pred shape "
+        f"{pred_arr.shape} (squeezed to {pred_2d.shape}) cannot be aligned to "
+        f"(n_voxels, n_times) = {target_shape}"
+    )
+
+
+def noise_ceiling_during_stim_present(
+    data,
+    pred,
+    bias_correction=True,
+    do_zscore=True,
+    stim_threshold=0.01,
+):
+    """Compute explainable variance using only stimulus-present time points.
+
+    Parameters
+    ----------
+    data : array of shape (n_repeats, n_times, n_voxels)
+        fMRI responses of repeated runs.
+    pred : array-like reducible to shape (n_voxels, n_times)
+        Prediction time courses used only to define stimulus-present masks.
+    bias_correction : bool
+        Perform bias correction based on the number of repetitions.
+    do_zscore : bool
+        z-score the data in time. Only set to False if your data time courses
+        are already z-scored.
+    stim_threshold : float
+        Time points with abs(pred) >= stim_threshold are treated as stimulus-present.
+
+    Returns
+    -------
+    ev : array of shape (n_voxels,)
+        Explainable variance per voxel during stimulus-present time points.
+    """
+    data_arr = np.asarray(data)
+    if data_arr.ndim != 3:
+        raise ValueError(
+            "Expected data shape (n_repeats, n_times, n_voxels), "
+            f"got {data_arr.shape}."
+        )
+
+    if stim_threshold < 0:
+        raise ValueError(f"stim_threshold must be >= 0, got {stim_threshold}")
+
+    n_repeats, n_times, n_voxels = data_arr.shape
+    if bias_correction and n_repeats < 2:
+        raise ValueError("Bias correction requires at least 2 repeats.")
+
+    pred_2d = _align_prediction_to_voxel_time(pred, n_voxels, n_times)
+
+    if do_zscore:
+        data_arr = scipy.stats.zscore(data_arr, axis=1)
+
+    ev = np.full(n_voxels, np.nan, dtype=float)
+    for voxel_index in range(n_voxels):
+        mask = np.abs(pred_2d[voxel_index]) >= stim_threshold
+        if np.count_nonzero(mask) < 2:
+            continue
+
+        voxel_data = data_arr[:, mask, voxel_index]
+
+        mean_var = voxel_data.var(axis=1, dtype=np.float64, ddof=1).mean(axis=0)
+        var_mean = voxel_data.mean(axis=0).var(axis=0, dtype=np.float64, ddof=1)
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            voxel_ev = var_mean / mean_var
+
+        if bias_correction:
+            voxel_ev = voxel_ev - (1 - voxel_ev) / (n_repeats - 1)
+
+        ev[voxel_index] = voxel_ev
+
+    ev = np.nan_to_num(ev, nan=0.0, posinf=0.0, neginf=0.0)
+    return ev
+
+
 def _extract_run_subrun(file_path: Path):
     match = re.search(r"run-(\d+).*_(subrun\d+)\.npy$", file_path.name)
     if match is None:
@@ -140,6 +230,10 @@ def main():
     sub_dir = data_dir / "derivatives" / "prf_data" / subject / "ses-1"
     psc_dir = sub_dir / "cut_and_averaged"
     space = settings["mri"]["space"]
+    pred_dir = sub_dir / "prf_fits" / "prf_predictions"
+
+    output_dir = sub_dir / "cut_and_averaged" / "noise_ceiling"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     subrun_entries = load_standard_subruns(subject, space, psc_dir)
 
@@ -152,9 +246,6 @@ def main():
         do_zscore=False,
     )
 
-    output_dir = sub_dir / "cut_and_averaged" / "noise_ceiling"
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     combined_file = (
         output_dir / f"{subject}_ses-1_task-pRF_space-{space}_desc-noiseceiling.npy"
     )
@@ -164,6 +255,34 @@ def main():
     print(f"Computed noise ceiling from {len(subrun_entries)} pRF runs for {subject}.")
     print(f"Saved: {combined_file}")
 
+    # Load the pRF model prediction for this subject/space.
+    pred_file = (
+        pred_dir
+        / f"{subject}_ses-1_task-pRF_final-fit_space-{space}_model-norm_stage-iter_desc-prf_pred.npy"
+    )
+    if not pred_file.exists():
+        raise FileNotFoundError(
+            "Could not find pRF prediction file needed for stimulus-present masking: "
+            f"{pred_file}"
+        )
+
+    prf_pred = np.load(pred_file)
+
+    ev_during_stim_present = noise_ceiling_during_stim_present(
+        repeated_data,
+        pred=prf_pred,
+        bias_correction=True,
+        do_zscore=False,
+    )
+
+    combined_file_during_stim_present = (
+        output_dir / f"{subject}_ses-1_task-pRF_space-{space}_desc-noiseceiling_during_stim_present.npy"
+    )
+
+    np.save(combined_file_during_stim_present, ev_during_stim_present)
+
+    print(f"Computed noise ceiling from {len(subrun_entries)} pRF runs for {subject}.")
+    print(f"Saved: {combined_file_during_stim_present}")
 
 if __name__ == "__main__":
     main()
