@@ -19,6 +19,13 @@ def _extract_run_subrun(file_path: Path):
     return match.group(1), match.group(2)
 
 
+def _subrun_sort_key(subrun_label: str):
+    match = re.search(r"subrun(\d+)", subrun_label)
+    if match is None:
+        return subrun_label
+    return int(match.group(1))
+
+
 def load_standard_subruns(subject, space, psc_dir):
     left_files = sorted(
         psc_dir.glob(
@@ -64,6 +71,11 @@ def load_standard_subruns(subject, space, psc_dir):
                 f"Got {first_shape} and {entry['data'].shape} (for {entry['name']})."
             )
 
+    subrun_entries = sorted(
+        subrun_entries,
+        key=lambda x: (int(x["run"]), _subrun_sort_key(x["subrun"])),
+    )
+
     return subrun_entries
 
 
@@ -79,6 +91,72 @@ def _run_sort_key(run_label: str):
     if match is None:
         return run_label
     return int(match.group(1))
+
+
+def build_standard_concatenated_folds(subrun_entries):
+    run_labels = sorted({entry["run"] for entry in subrun_entries}, key=lambda r: int(r))
+    subrun_labels = sorted(
+        {entry["subrun"] for entry in subrun_entries},
+        key=_subrun_sort_key,
+    )
+
+    if len(run_labels) != 3 or len(subrun_labels) != 3:
+        raise ValueError(
+            "condition='standardconcatenated' expects exactly 3 runs x 3 subruns. "
+            f"Found runs={run_labels}, subruns={subrun_labels}."
+        )
+
+    entry_lookup = {
+        (entry["run"], entry["subrun"]): entry for entry in subrun_entries
+    }
+    expected_pairs = {
+        (run_label, subrun_label)
+        for run_label in run_labels
+        for subrun_label in subrun_labels
+    }
+    missing_pairs = sorted(expected_pairs - set(entry_lookup.keys()))
+    if missing_pairs:
+        missing_str = ", ".join(
+            [f"run-{run}_{subrun}" for run, subrun in missing_pairs]
+        )
+        raise ValueError(
+            "Missing pRF standard subrun combinations required for "
+            f"condition='standardconcatenated': {missing_str}"
+        )
+
+    
+    folds = []
+    for j in [0, 1, 2]:  # Rotate which run is held out as test.
+        # rotate run labels so each run is test once, and pair with each subrun in turn
+        run_a = run_labels[j]
+        run_b = run_labels[(j + 1) % len(run_labels)]
+        run_c = run_labels[(j + 2) % len(run_labels)]
+        
+
+        for i, subrun_a in enumerate(subrun_labels):
+            subrun_b = subrun_labels[(i + 1) % len(subrun_labels)]
+            subrun_c = subrun_labels[(i + 2) % len(subrun_labels)]
+
+            train_entries = [
+                entry_lookup[(run_a, subrun_a)],
+                entry_lookup[(run_b, subrun_b)],
+            ]
+            test_entry = entry_lookup[(run_c, subrun_c)]
+
+            folds.append(
+                {
+                    "train_entries": train_entries,
+                    "test_entry": test_entry,
+                    "name": (
+                        f"train-{train_entries[0]['name']}_and_{train_entries[1]['name']}"
+                        f"_test-{test_entry['name']}"
+                    ),
+                }
+            )
+    for fold in folds:
+        print(fold["name"])
+
+    return folds
 
 
 def load_condition_runs(subject, space, psc_dir, dm_dir, condition):
@@ -283,7 +361,10 @@ parser.add_argument(
     "condition",
     default=None,
     nargs="?",
-    help="the condition of the experiment, standard, violation, omission, sparse",
+    help=(
+        "the condition of the experiment, standard, standardconcatenated, "
+        "violation, omission, sparse"
+    ),
 )
 cmd_args = parser.parse_args()
 subject, condition = cmd_args.subject, cmd_args.condition
@@ -347,6 +428,67 @@ if condition == "standard":
         
         fold_params_df.to_csv(fold_tsv, sep="\t", index=False)
 
+elif condition == "standardconcatenated":
+    psc_dir = sub_dir / "cut_and_averaged"
+    dm_dir = sub_dir / "dms"
+    cv_params_dir = prf_params_dir / "cv"
+    cv_params_dir.mkdir(parents=True, exist_ok=True)
+
+    dm_file = dm_dir / "dm_task-pRF_run-01.npy"
+    if not dm_file.exists():
+        raise FileNotFoundError(f"Could not find pRF design matrix: {dm_file}")
+
+    prf_dm = np.load(dm_file)
+    single_stimulus = build_stimulus(prf_dm, settings)
+    concatenated_stimulus = build_stimulus(
+        np.concatenate([prf_dm, prf_dm], axis=2),
+        settings,
+    )
+
+    # Ensure parameter order matches the fitter's expected array format.
+    starting_params_array = Parameters(starting_params, model="norm").to_array()
+    subrun_entries = load_standard_subruns(subject, space, psc_dir)
+    fold_specs = build_standard_concatenated_folds(subrun_entries)
+
+    expected_single_n_trs = prf_dm.shape[-1]
+    for entry in subrun_entries:
+        if entry["data"].shape[1] != expected_single_n_trs:
+            raise ValueError(
+                "Standard subrun length must match pRF design matrix length. "
+                f"Expected {expected_single_n_trs} TRs, got {entry['data'].shape[1]} "
+                f"for {entry['name']}."
+            )
+
+    n_jobs = settings.get("slurm", {}).get("cpus", 1)
+
+    for fold in fold_specs:
+        train_entries = fold["train_entries"]
+        heldout_entry = fold["test_entry"]
+
+        # Concatenate two training subruns so fit/test are comparable to PE CV.
+        train_data = np.concatenate([entry["data"] for entry in train_entries], axis=1)
+        test_data = heldout_entry["data"]
+
+        fold_params_df = fit_prf_model(
+            starting_params=starting_params_array,
+            train_stimulus=concatenated_stimulus,
+            train_data=train_data,
+            test_data=test_data,
+            settings=settings,
+            test_stimulus=single_stimulus,
+            n_jobs=n_jobs,
+        )
+
+        fold_name = (
+            f"{subject}_ses-1_standardconcatenated-fit_space-{space}_"
+            f"loo-{heldout_entry['name']}"
+        )
+        fold_tsv = (
+            cv_params_dir / f"{fold_name}_model-norm_stage-iter_desc-prf_params.tsv"
+        )
+
+        fold_params_df.to_csv(fold_tsv, sep="\t", index=False)
+    
 elif condition in {"violation", "omission", "sparse"}:
     psc_dir = sub_dir / "cut_and_averaged"
     dm_dir = sub_dir / "dms"
@@ -392,5 +534,5 @@ elif condition in {"violation", "omission", "sparse"}:
 else:
     raise ValueError(
         f"Unsupported condition '{condition}'. Currently implemented: "
-        "'standard', 'violation', 'omission', 'sparse'."
+        "'standard', 'standardconcatenated', 'violation', 'omission', 'sparse'."
     )
